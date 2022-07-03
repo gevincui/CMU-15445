@@ -86,5 +86,14 @@ class ParallelBufferPoolManager : public BufferPoolManager {
    * Flushes all the pages in the buffer pool to disk.
    */
   void FlushAllPgsImp() override;
+
+  /** How many instances are in the parallel BPM (if present, otherwise just 1 BPI) */
+  uint32_t num_instances_;
+  /** Number of pages in the buffer pool. */
+  size_t pool_size_;
+  /** List of buffer pool instances. */
+  vector<BufferPoolManager*> instances_;
+  /** 第一个尝试新建磁盘数据页的buffer pool instance下标 */
+  uint32_t start_index_instances_ = 0;
 };
 }  // namespace bustub

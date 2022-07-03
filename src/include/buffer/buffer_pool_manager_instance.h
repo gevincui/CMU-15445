@@ -131,17 +131,17 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   std::atomic<page_id_t> next_page_id_ = instance_index_;
 
   /** Array of buffer pool pages. */
-  Page *pages_;
+  Page *pages_;            // 实际上是frames，表示buffer pool
   /** Pointer to the disk manager. */
   DiskManager *disk_manager_ __attribute__((__unused__));
   /** Pointer to the log manager. */
   LogManager *log_manager_ __attribute__((__unused__));
   /** Page table for keeping track of buffer pool pages. */
-  std::unordered_map<page_id_t, frame_id_t> page_table_;
+  std::unordered_map<page_id_t, frame_id_t> page_table_;     // page和frame的映射
   /** Replacer to find unpinned pages for replacement. */
   Replacer *replacer_;
   /** List of free pages. */
-  std::list<frame_id_t> free_list_;
+  std::list<frame_id_t> free_list_;     // 可用的frame列表
   /** This latch protects shared data structures. We recommend updating this comment to describe what it protects. */
   std::mutex latch_;
 };
