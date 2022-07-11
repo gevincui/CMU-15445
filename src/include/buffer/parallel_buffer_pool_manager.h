@@ -17,6 +17,8 @@
 #include "storage/disk/disk_manager.h"
 #include "storage/page/page.h"
 
+#include <vector>
+
 namespace bustub {
 
 class ParallelBufferPoolManager : public BufferPoolManager {

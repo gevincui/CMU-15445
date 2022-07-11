@@ -18,7 +18,8 @@ namespace bustub {
 
 BufferPoolManagerInstance::BufferPoolManagerInstance(size_t pool_size, DiskManager *disk_manager,
                                                      LogManager *log_manager)
-    : BufferPoolManagerInstance(pool_size, 1, 0, disk_manager, log_manager) {}
+    : BufferPoolManagerInstance(pool_size, 1, 0, disk_manager, log_manager) {
+}
 
 BufferPoolManagerInstance::BufferPoolManagerInstance(size_t pool_size, uint32_t num_instances, uint32_t instance_index,
                                                      DiskManager *disk_manager, LogManager *log_manager)
@@ -45,6 +46,7 @@ BufferPoolManagerInstance::BufferPoolManagerInstance(size_t pool_size, uint32_t 
 BufferPoolManagerInstance::~BufferPoolManagerInstance() {
   delete[] pages_;
   delete replacer_;
+
 }
 
 // 刷盘

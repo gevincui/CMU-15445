@@ -26,6 +26,7 @@ namespace bustub {
  * | RecordCount (4) | Entry_1 name (32) | Entry_1 root_id (4) | ... |
  *  -----------------------------------------------------------------
  */
+ // 用于存元数据的header page，记录所有索引树的索引字段名所属的根数据页
 class HeaderPage : public Page {
  public:
   void Init() { SetRecordCount(0); }

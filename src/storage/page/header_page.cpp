@@ -20,6 +20,7 @@ namespace bustub {
  * Record related
  */
 auto HeaderPage::InsertRecord(const std::string &name, const page_id_t root_id) -> bool {
+
   assert(name.length() < 32);
   assert(root_id > INVALID_PAGE_ID);
 

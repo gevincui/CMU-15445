@@ -73,6 +73,13 @@ class BPlusTree {
   // expose for test purpose
   auto FindLeafPage(const KeyType &key, bool leftMost = false) -> Page *;
 
+  uint64_t getThreadId() {  // only for DEBUG
+    std::stringstream ss;
+    ss << std::this_thread::get_id();
+    uint64_t thread_id = std::stoull(ss.str());
+    return thread_id % 13;
+  }
+
  private:
   void StartNewTree(const KeyType &key, const ValueType &value);
 
@@ -104,8 +111,8 @@ class BPlusTree {
   void ToString(BPlusTreePage *page, BufferPoolManager *bpm) const;
 
   // member variable
-  std::string index_name_;
-  page_id_t root_page_id_;
+  std::string index_name_;    // 索引字段名
+  page_id_t root_page_id_;    // 根数据页id
   BufferPoolManager *buffer_pool_manager_;
   KeyComparator comparator_;
   int leaf_max_size_;
