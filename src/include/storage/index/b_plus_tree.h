@@ -85,22 +85,6 @@ class BPlusTree {
     return thread_id % 13;
   }
 
-  int OpToString(Operation op) {  // only for debug
-    std::string res;
-    int d;
-    if (op == Operation::FIND) {
-      res = "FIND";
-      d = 0;
-    } else if (op == Operation::INSERT) {
-      res = "INSERT";
-      d = 1;
-    } else if (op == Operation::DELETE) {
-      res = "DELETE";
-      d = 2;
-    }
-    return d;
-  }
-
  private:
   void StartNewTree(const KeyType &key, const ValueType &value);
 

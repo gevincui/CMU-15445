@@ -60,7 +60,8 @@ class ExecutionEngine {
       Tuple tuple;
       RID rid;
       while (executor->Next(&tuple, &rid)) {
-        if (result_set != nullptr) {
+        // insert、update操作父节点没有tuple返回
+        if (result_set != nullptr && tuple.IsAllocated()) {
           result_set->push_back(tuple);
         }
       }

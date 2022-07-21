@@ -27,6 +27,10 @@ namespace bustub {
  */
 
 class IndexScanExecutor : public AbstractExecutor {
+  using KeyType = GenericKey<8>;
+  using ValueType = RID;
+  using KeyComparator = GenericComparator<8>;
+
  public:
   /**
    * Creates a new index scan executor.
@@ -42,7 +46,16 @@ class IndexScanExecutor : public AbstractExecutor {
   auto Next(Tuple *tuple, RID *rid) -> bool override;
 
  private:
+  BPlusTreeIndex<KeyType, ValueType, KeyComparator> *GetBPlusTreeIndex() {
+    return dynamic_cast<BPlusTreeIndex<KeyType, ValueType, KeyComparator> *>(index_info_->index_.get());
+  }
   /** The index scan plan node to be executed. */
   const IndexScanPlanNode *plan_;
+  // 表的元数据
+  const TableInfo *table_info_;
+  // 索引的元数据
+  const IndexInfo *index_info_;
+
+  std::unique_ptr<INDEXITERATOR_TYPE> index_iter_{nullptr};
 };
 }  // namespace bustub

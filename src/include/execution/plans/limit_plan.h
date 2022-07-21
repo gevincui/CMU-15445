@@ -22,18 +22,22 @@ namespace bustub {
 class LimitPlanNode : public AbstractPlanNode {
  public:
   /**
-   * Construct a new LimitPlanNode instance.
-   * @param child The child plan from which tuples are obtained
-   * @param limit The number of output tuples
+   * Creates a new limit plan node that has a child plan.
+   * @param child the child plan to obtain tuple from
+   * @param limit the number of output tuples
+   * @param offset the number of rows to be skipped
    */
-  LimitPlanNode(const Schema *output_schema, const AbstractPlanNode *child, std::size_t limit)
-      : AbstractPlanNode(output_schema, {child}), limit_{limit} {}
+  LimitPlanNode(const Schema *output_schema, const AbstractPlanNode *child, size_t limit, size_t offset)
+      : AbstractPlanNode(output_schema, {child}), limit_(limit), offset_(offset) {}
 
   /** @return The type of the plan node */
   auto GetType() const -> PlanType override { return PlanType::Limit; }
 
   /** @return The limit */
   auto GetLimit() const -> size_t { return limit_; }
+
+  /** @return The offset */
+  auto GetOffset() const { return offset_; }
 
   /** @return The child plan node */
   auto GetChildPlan() const -> const AbstractPlanNode * {
@@ -44,6 +48,8 @@ class LimitPlanNode : public AbstractPlanNode {
  private:
   /** The limit */
   std::size_t limit_;
+  /** The offset */
+  size_t offset_;
 };
 
 }  // namespace bustub

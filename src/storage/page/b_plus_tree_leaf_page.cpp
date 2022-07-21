@@ -104,7 +104,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &val
     -> int {
   int insert_index = KeyIndex(key, comparator);   // 找到第一个>=key的下标
 
-  if (comparator(KeyAt(insert_index), key) == 0) {  // 如果找到=key的，说明插入重复的key，直接返回
+  if (GetSize() != 0 && comparator(KeyAt(insert_index), key) == 0) {  // 如果找到=key的，说明插入重复的key，直接返回
     return GetSize();
   }
 

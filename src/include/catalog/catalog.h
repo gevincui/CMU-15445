@@ -21,7 +21,7 @@
 #include "buffer/buffer_pool_manager.h"
 #include "catalog/schema.h"
 #include "container/hash/hash_function.h"
-#include "storage/index/extendible_hash_table_index.h"
+#include "storage/index/b_plus_tree_index.h"
 #include "storage/index/index.h"
 #include "storage/table/table_heap.h"
 
@@ -127,16 +127,20 @@ class Catalog {
     }
 
     // Construct the table heap
+    // 创建表，通过buffer pool manager、...进行初始化
     auto table = std::make_unique<TableHeap>(bpm_, lock_manager_, log_manager_, txn);
 
     // Fetch the table OID for the new table
+    // 给新建的表分配一个id
     const auto table_oid = next_table_oid_.fetch_add(1);
 
     // Construct the table information
+    // 创建新建表的元数据信息，包括列信息(schema)、表名、表id等
     auto meta = std::make_unique<TableInfo>(schema, table_name, std::move(table), table_oid);
     auto *tmp = meta.get();
 
     // Update the internal tracking mechanisms
+    // 将新建表加入catalog的tables中
     tables_.emplace(table_oid, std::move(meta));
     table_names_.emplace(table_name, table_oid);
     index_names_.emplace(table_name, std::unordered_map<std::string, index_oid_t>{});
@@ -190,53 +194,45 @@ class Catalog {
    */
   template <class KeyType, class ValueType, class KeyComparator>
   auto CreateIndex(Transaction *txn, const std::string &index_name, const std::string &table_name, const Schema &schema,
-                   const Schema &key_schema, const std::vector<uint32_t> &key_attrs, std::size_t keysize,
-                   HashFunction<KeyType> hash_function) -> IndexInfo * {
-    // Reject the creation request for nonexistent table
+                   const Schema &key_schema, const std::vector<uint32_t> &key_attrs, std::size_t keysize, HashFunction<KeyType> hash_function) -> IndexInfo * {
+    // 如果表不存在，直接返回
     if (table_names_.find(table_name) == table_names_.end()) {
       return NULL_INDEX_INFO;
     }
 
-    // If the table exists, an entry for the table should already be present in index_names_
-    BUSTUB_ASSERT((index_names_.find(table_name) != index_names_.end()), "Broken Invariant");
-
-    // Determine if the requested index already exists for this table
+    // 如果索引已存在，直接返回
     auto &table_indexes = index_names_.find(table_name)->second;
     if (table_indexes.find(index_name) != table_indexes.end()) {
       // The requested index already exists for this table
       return NULL_INDEX_INFO;
     }
 
-    // Construct index metdata
+    // 新建索引的元数据信息
     auto meta = std::make_unique<IndexMetadata>(index_name, table_name, &schema, key_attrs);
 
-    // Construct the index, take ownership of metadata
-    // TODO(Kyle): We should update the API for CreateIndex
-    // to allow specification of the index type itself, not
-    // just the key, value, and comparator types
-    auto index = std::make_unique<ExtendibleHashTableIndex<KeyType, ValueType, KeyComparator>>(std::move(meta), bpm_,
-                                                                                               hash_function);
+    // 新建B+树索引
+    auto index = std::make_unique<BPLUSTREE_INDEX_TYPE>(std::move(meta), bpm_);
 
-    // Populate the index with all tuples in table heap
-    auto *table_meta = GetTable(table_name);
-    auto *heap = table_meta->table_.get();
-    for (auto tuple = heap->Begin(txn); tuple != heap->End(); ++tuple) {
-      index->InsertEntry(tuple->KeyFromTuple(schema, key_schema, key_attrs), tuple->GetRid(), txn);
+    // 新建索引的信息
+    auto index_info = std::make_unique<IndexInfo>(key_schema, index_name, std::move(index), next_index_oid_, table_name, keysize);
+    auto result = index_info.get();
+
+    // 更新catalog的索引信息
+    indexes_.emplace(result->index_oid_, std::move(index_info));
+    index_names_[result->table_name_].emplace(result->name_, result->index_oid_);
+    ++next_index_oid_;
+
+    // 获取表数据
+    auto table_meta_data = GetTable(result->table_name_);
+    auto table_heap = table_meta_data->table_.get();
+
+    // 遍历表的每一个tuple，抽取需要的索引列，依次插入到新建的B+树索引
+    for (auto it = table_heap->Begin(txn); it != table_heap->End(); ++it) {
+      result->index_->InsertEntry(it->KeyFromTuple(schema, result->key_schema_, result->index_->GetKeyAttrs()),
+                                  it->GetRid(), txn);
     }
 
-    // Get the next OID for the new index
-    const auto index_oid = next_index_oid_.fetch_add(1);
-
-    // Construct index information; IndexInfo takes ownership of the Index itself
-    auto index_info =
-        std::make_unique<IndexInfo>(key_schema, index_name, std::move(index), index_oid, table_name, keysize);
-    auto *tmp = index_info.get();
-
-    // Update internal tracking
-    indexes_.emplace(index_oid, std::move(index_info));
-    table_indexes.emplace(index_name, index_oid);
-
-    return tmp;
+    return result;
   }
 
   /**

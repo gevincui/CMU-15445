@@ -53,5 +53,9 @@ class LimitExecutor : public AbstractExecutor {
   const LimitPlanNode *plan_;
   /** The child executor from which tuples are obtained */
   std::unique_ptr<AbstractExecutor> child_executor_;
+
+  // limit m,n
+  uint32_t skipped{0};   // m
+  uint32_t emitted{0};   // 用于计数，从0开始到n结束
 };
 }  // namespace bustub

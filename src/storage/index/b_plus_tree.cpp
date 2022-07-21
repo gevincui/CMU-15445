@@ -51,7 +51,7 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
   LeafPage *leaf_node = reinterpret_cast<LeafPage *>(leaf_page->GetData());
 
   // 再到应该包含key的叶子数据页查找有没有这个key
-  ValueType value{};
+  ValueType value;
   bool is_exist = leaf_node->Lookup(key, &value, comparator_);
 
   // 读操作结束，要释放锁住的叶子数据页
@@ -100,16 +100,14 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
  */
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value) {
-  // 磁盘新建数据页并读入buffer pool，page id设为INVALID表示为根数据页
-  page_id_t new_page_id = INVALID_PAGE_ID;
-  Page *root_page = buffer_pool_manager_->NewPage(&new_page_id);  // 对应的frame会被pinned住
-  // 将新建的page id赋值给root page id，并将元数据(索引字段名+root page id)插入header page
-  root_page_id_ = new_page_id;
+  // 磁盘新建数据页并读入buffer pool，新的page id作为root page id
+  Page *root_page = buffer_pool_manager_->NewPage(&root_page_id_);  // 对应的frame会被pinned住
+  // 将元数据(索引字段名+root page id)插入header page
   UpdateRootPageId(1);  // insert root page id in header page
 
   // 将数据插入到buffer pool中新建的数据页中
   LeafPage *root_node = reinterpret_cast<LeafPage *>(root_page->GetData());
-  root_node->Init(new_page_id, INVALID_PAGE_ID, leaf_max_size_);
+  root_node->Init(root_page_id_, INVALID_PAGE_ID, leaf_max_size_);
   root_node->Insert(key, value, comparator_);
 
   // 用完了该frame，需要unpinned
@@ -706,7 +704,7 @@ auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE {
   LeafPage *leaf_node = reinterpret_cast<LeafPage *>(leaf_page->GetData());
   // 如果key存在，idx为key的slot下标，如果key不存在，idx为插入key应该在的slot下标
   int idx = leaf_node->KeyIndex(key, comparator_);
-            leaf_page->GetPageId(), leaf_node->GetPageId());   // DEBUG
+            leaf_page->GetPageId(), leaf_node->GetPageId();   // DEBUG
   return INDEXITERATOR_TYPE(buffer_pool_manager_, leaf_page, idx);
 }
 

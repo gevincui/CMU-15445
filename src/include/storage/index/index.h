@@ -67,8 +67,10 @@ class IndexMetadata {
    * NOTE: this must be defined inside the cpp source file because it
    * uses the member of catalog::Schema which is not known here.
    */
+   // 索引的列数(联合索引)
   auto GetIndexColumnCount() const -> std::uint32_t { return static_cast<uint32_t>(key_attrs_.size()); }
 
+  // 索引列和表列的映射关系，存储的下标表示该列为索引
   /** @return The mapping relation between indexed columns and base table columns */
   inline auto GetKeyAttrs() const -> const std::vector<uint32_t> & { return key_attrs_; }
 
@@ -91,8 +93,10 @@ class IndexMetadata {
   /** The name of the table on which the index is created */
   std::string table_name_;
   /** The mapping relation between key schema and tuple schema */
+  // 索引列和原表列的映射关系
   const std::vector<uint32_t> key_attrs_;
   /** The schema of the indexed key */
+  // 索引的列信息
   Schema *key_schema_;
 };
 

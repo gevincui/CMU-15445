@@ -43,6 +43,7 @@ class SimpleAggregationHashTable {
       : agg_exprs_{agg_exprs}, agg_types_{agg_types} {}
 
   /** @return The initial aggregrate value for this aggregation executor */
+  // 为聚合操作提供初始值
   auto GenerateInitialAggregateValue() -> AggregateValue {
     std::vector<Value> values{};
     for (const auto &agg_type : agg_types_) {
@@ -73,6 +74,7 @@ class SimpleAggregationHashTable {
    * @param[out] result The output aggregate value
    * @param input The input value
    */
+   // 实现聚合操作的函数
   void CombineAggregateValues(AggregateValue *result, const AggregateValue &input) {
     for (uint32_t i = 0; i < agg_exprs_.size(); i++) {
       switch (agg_types_[i]) {
@@ -101,6 +103,8 @@ class SimpleAggregationHashTable {
    * @param agg_key the key to be inserted
    * @param agg_val the value to be inserted
    */
+   // 实现group by的方法：执行相应的聚合操作
+   // 如果哈希表不存在该Key，则先给该Key设为聚合操作的初始值
   void InsertCombine(const AggregateKey &agg_key, const AggregateValue &agg_val) {
     if (ht_.count(agg_key) == 0) {
       ht_.insert({agg_key, GenerateInitialAggregateValue()});
@@ -145,6 +149,7 @@ class SimpleAggregationHashTable {
 
  private:
   /** The hash table is just a map from aggregate keys to aggregate values */
+  // 实现group by的哈希表，AggregateKey是group by要操作的列
   std::unordered_map<AggregateKey, AggregateValue> ht_{};
   /** The aggregate expressions that we have */
   const std::vector<const AbstractExpression *> &agg_exprs_;
@@ -204,13 +209,14 @@ class AggregationExecutor : public AbstractExecutor {
   }
 
  private:
-  /** The aggregation plan node */
+  /** The aggregation plan node. */
   const AggregationPlanNode *plan_;
-  /** The child executor that produces tuples over which the aggregation is computed */
+  /** The child executor whose tuples we are aggregating. */
+  // 孩子节点的执行器执行全表扫描
   std::unique_ptr<AbstractExecutor> child_;
-  /** Simple aggregation hash table */
-  // TODO(Student): Uncomment SimpleAggregationHashTable aht_;
-  /** Simple aggregation hash table iterator */
-  // TODO(Student): Uncomment SimpleAggregationHashTable::Iterator aht_iterator_;
+  /** Simple aggregation hash table. */
+  SimpleAggregationHashTable aht_;
+  /** Simple aggregation hash table iterator. */
+  SimpleAggregationHashTable::Iterator aht_iterator_;
 };
 }  // namespace bustub
