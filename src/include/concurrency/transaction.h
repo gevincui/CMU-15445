@@ -41,6 +41,38 @@ namespace bustub {
  *    |_________________________^
  *
  **/
+
+/**
+ * 2PL
+ * 1、两阶段锁协议(2PL)
+ * 每个事务分两个阶段进行加锁和解锁，存在级联回滚的问题
+ * 增长阶段growing phase）：事务可以获得锁，但是不可以释放锁
+ * 缩减阶段（shrinking phase）：事务可以释放锁，但是不能获得新锁
+ * 级联回滚：指一个事（务的回滚引起了一系列相关事务的回滚，例如：别的事务的写操作使用了该事务创建的数据，要一起回滚
+ *
+ * 2、严格两阶段锁协议(Non-2PL)
+ * 所有写锁不允许在事务提交之前释放
+ * 因为事务提交前，别的事务使用不了该事务创建的数据，所以可以避免级联回滚
+ *
+ * 3、强两阶段锁协议(2PL)
+ * 等到整个事务提交或回滚后，才能释放锁
+ *
+ * ----------------------------------------------------------------------------------------------
+ *
+ * 隔离级别(注意：以下的读锁指读操作即加锁，非MySQL概念的当前读读锁)
+ * 1、读未提交(实现了强2PL，因此有SHRINKING状态)
+ * 读不加读锁，写加写锁，在事务提交时释放写锁
+ * 因为读操作不加锁，所以不会被写锁阻塞，实现读未提交
+ *
+ * 2、读已提交(实现了严格2PL，仅有GROWING状态)
+ * 读加读锁，sql执行完即释放读锁，写加写锁，在事务提交时释放写锁
+ * 因为读操作完即释放读锁，所以读操作后别的事务还能拿到写锁，后面的读操作能读到别的写事务提交后的数据
+ *
+ * 3、可重复读(实现了强2PL，因此有SHRINKING状态)
+ * 读加读锁，写加写锁，在事务提交时释放读写锁
+ * 因为事务提交才能释放读锁，所以一个事务的读操作会阻塞别的事务的写操作，该事务内读到的数据保持不变
+ *
+ */
 enum class TransactionState { GROWING, SHRINKING, COMMITTED, ABORTED };
 
 /**
@@ -61,6 +93,8 @@ using index_oid_t = uint32_t;
 /**
  * WriteRecord tracks information related to a write.
  */
+
+// 事务中记录的表的写操作
 class TableWriteRecord {
  public:
   TableWriteRecord(RID rid, WType wtype, const Tuple &tuple, TableHeap *table)
@@ -69,6 +103,7 @@ class TableWriteRecord {
   RID rid_;
   WType wtype_;
   /** The tuple is only used for the update operation. */
+  // 更新前的tuple数据
   Tuple tuple_;
   /** The table heap specifies which table this write record is for. */
   TableHeap *table_;
@@ -77,6 +112,8 @@ class TableWriteRecord {
 /**
  * WriteRecord tracks information related to a write.
  */
+
+// 事务中记录的索引的写操作
 class IndexWriteRecord {
  public:
   IndexWriteRecord(RID rid, table_oid_t table_oid, WType wtype, const Tuple &tuple, const Tuple &old_tuple,
@@ -108,11 +145,17 @@ class IndexWriteRecord {
 /**
  * Reason to a transaction abortion
  */
+
+// 终止事务的原因
 enum class AbortReason {
+  // 强2PL，缩减阶段不能释放锁，要等事务提交后才释放
   LOCK_ON_SHRINKING,
   UNLOCK_ON_SHRINKING,
+  // 锁升级冲突，已有其它事务准备升级锁
   UPGRADE_CONFLICT,
+  // 死锁
   DEADLOCK,
+  // 读未提交隔离级别下，上了读锁
   LOCKSHARED_ON_READ_UNCOMMITTED
 };
 
@@ -182,13 +225,14 @@ class Transaction {
   /** @return the isolation level of this transaction */
   inline auto GetIsolationLevel() const -> IsolationLevel { return isolation_level_; }
 
-  /** @return the list of table write records of this transaction */
+  // 记录原表的所有写操作，用于回滚
   inline auto GetWriteSet() -> std::shared_ptr<std::deque<TableWriteRecord>> { return table_write_set_; }
 
-  /** @return the list of index write records of this transaction */
+  // 记录索引的所有写操作，用于回滚
   inline auto GetIndexWriteSet() -> std::shared_ptr<std::deque<IndexWriteRecord>> { return index_write_set_; }
 
   /** @return the page set */
+  // 该事务正在上锁的B+树数据页
   inline auto GetPageSet() -> std::shared_ptr<std::deque<Page *>> { return page_set_; }
 
   /**
@@ -211,6 +255,8 @@ class Transaction {
    * Adds a page into the page set.
    * @param page page to be added
    */
+
+  // 把B+树数据页加入到当前事务中
   inline void AddIntoPageSet(Page *page) { page_set_->push_back(page); }
 
   /** @return the deleted page set */
@@ -229,9 +275,11 @@ class Transaction {
   inline auto GetExclusiveLockSet() -> std::shared_ptr<std::unordered_set<RID>> { return exclusive_lock_set_; }
 
   /** @return true if rid is shared locked by this transaction */
+  // 判断当前rid对应的原表tuple是否被上了读锁
   auto IsSharedLocked(const RID &rid) -> bool { return shared_lock_set_->find(rid) != shared_lock_set_->end(); }
 
   /** @return true if rid is exclusively locked by this transaction */
+  // 判断当前rid对应的原表tuple是否被上了写锁
   auto IsExclusiveLocked(const RID &rid) -> bool {
     return exclusive_lock_set_->find(rid) != exclusive_lock_set_->end();
   }
@@ -277,8 +325,10 @@ class Transaction {
   std::shared_ptr<std::unordered_set<page_id_t>> deleted_page_set_;
 
   /** LockManager: the set of shared-locked tuples held by this transaction. */
+  // 记录原表哪些rid对应tuple被上了读锁
   std::shared_ptr<std::unordered_set<RID>> shared_lock_set_;
   /** LockManager: the set of exclusive-locked tuples held by this transaction. */
+  // 记录原表哪些rid对应tuple被上了写锁
   std::shared_ptr<std::unordered_set<RID>> exclusive_lock_set_;
 };
 

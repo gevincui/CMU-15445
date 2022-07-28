@@ -32,9 +32,10 @@ void AggregationExecutor::Init() {
   RID rid;
   // 子节点执行器用于查找满足条件(where条件，seq_scan)的下一个tuple
   while (child_->Next(&tuple, &rid)) {
+
     // 哈希表维护的key是group by的字段，对应value是这个group by字段的聚合操作的结果
-    // 如果不存在group by条件，则哈希表只有一个key为{}
-    // 如果存在group by条件，则哈希表的key为字段a的所有不同值
+    // 如果不存在group by 条件，则哈希表只有一个key为{}
+    // 如果存在group by 字段a，则哈希表的key为字段a的所有不同值
     aht_.InsertCombine(MakeAggregateKey(&tuple), MakeAggregateValue(&tuple));
   }
 

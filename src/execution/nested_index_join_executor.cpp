@@ -67,14 +67,41 @@ bool NestIndexJoinExecutor::Probe(Tuple *left_tuple, Tuple *right_raw_tuple) {
   Tuple probe_key = Tuple{{key_value}, inner_index_info_->index_->GetKeySchema()};
 
   // 根据索引字段值去B+树检索得到对应rid
+  // 因为是唯一索引，所以结果集大小为1
   std::vector<RID> result_set;
   GetBPlusTreeIndex()->ScanKey(probe_key, &result_set, exec_ctx_->GetTransaction());
   if (result_set.empty()) {
     return false;
   }
 
+  // 实现隔离级别
+  switch (exec_ctx_->GetTransaction()->GetIsolationLevel()) {
+    case IsolationLevel::READ_UNCOMMITTED:
+      // 如果是读未提交隔离级别，不加读锁
+      break;
+    case IsolationLevel::READ_COMMITTED:
+    case IsolationLevel::REPEATABLE_READ:
+      // 如果是可重复读隔离级别，申请读锁，事务提交再释放
+      if (!exec_ctx_->GetTransaction()->IsSharedLocked(result_set[0]) &&
+          !exec_ctx_->GetTransaction()->IsExclusiveLocked(result_set[0]) &&
+          !exec_ctx_->GetLockManager()->LockShared(exec_ctx_->GetTransaction(), result_set[0])) {
+        // 如果该事务没拿到读锁或写锁，且申请读锁失败，则直接return
+        return false;
+      }
+      break;
+    default:
+      break;
+  }
+
   // 根据rid到原表拿到对应tuple
-  return inner_table_info_->table_->GetTuple(result_set[0], right_raw_tuple, exec_ctx_->GetTransaction());
+  bool searched = inner_table_info_->table_->GetTuple(result_set[0], right_raw_tuple, exec_ctx_->GetTransaction());
+
+  // 如果是读提交隔离级别，用完锁即释放
+  if (searched && exec_ctx_->GetTransaction()->GetIsolationLevel() == IsolationLevel::READ_COMMITTED) {
+    return exec_ctx_->GetLockManager()->Unlock(exec_ctx_->GetTransaction(), result_set[0]);
+  }
+
+  return searched;
 }
 
 }  // namespace bustub

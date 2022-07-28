@@ -29,9 +29,11 @@
 #include "execution/expressions/column_value_expression.h"
 #include "execution/expressions/comparison_expression.h"
 #include "execution/expressions/constant_value_expression.h"
+#include "execution/plans/delete_plan.h"
 #include "execution/plans/limit_plan.h"
 #include "execution/plans/nested_index_join_plan.h"
 #include "execution/plans/seq_scan_plan.h"
+#include "execution/plans/update_plan.h"
 #include "gtest/gtest.h"
 #include "test_util.h"  // NOLINT
 #include "type/value_factory.h"
@@ -47,6 +49,12 @@
       << "Test Failed Due to Time Out";
 
 namespace bustub {
+
+constexpr static const auto BIGINT_SIZE = 8;
+using BigintKeyType = GenericKey<BIGINT_SIZE>;
+using BigintValueType = RID;
+using BigintComparatorType = GenericComparator<BIGINT_SIZE>;
+using BigintHashFunctionType = HashFunction<BigintKeyType>;
 
 class TransactionTest : public ::testing::Test {
  public:
@@ -79,47 +87,47 @@ class TransactionTest : public ::testing::Test {
     // Shut down the disk manager and clean up the transaction.
     disk_manager_->ShutDown();
     remove("executor_test.db");
+    remove("executor_test.log");
     delete txn_;
   };
 
   /** @return the executor context in our test class */
-  auto GetExecutorContext() -> ExecutorContext * { return exec_ctx_.get(); }
-  auto GetExecutionEngine() -> ExecutionEngine * { return execution_engine_.get(); }
-  auto GetTxn() -> Transaction * { return txn_; }
-  auto GetTxnManager() -> TransactionManager * { return txn_mgr_.get(); }
-  auto GetCatalog() -> Catalog * { return catalog_.get(); }
-  auto GetBPM() -> BufferPoolManager * { return bpm_.get(); }
-  auto GetLockManager() -> LockManager * { return lock_manager_.get(); }
+  ExecutorContext *GetExecutorContext() { return exec_ctx_.get(); }
+  ExecutionEngine *GetExecutionEngine() { return execution_engine_.get(); }
+  Transaction *GetTxn() { return txn_; }
+  TransactionManager *GetTxnManager() { return txn_mgr_.get(); }
+  Catalog *GetCatalog() { return catalog_.get(); }
+  BufferPoolManager *GetBPM() { return bpm_.get(); }
+  LockManager *GetLockManager() { return lock_manager_.get(); }
 
   // The below helper functions are useful for testing.
 
-  auto MakeColumnValueExpression(const Schema &schema, uint32_t tuple_idx, const std::string &col_name)
-      -> const AbstractExpression * {
+  const AbstractExpression *MakeColumnValueExpression(const Schema &schema, uint32_t tuple_idx,
+                                                      const std::string &col_name) {
     uint32_t col_idx = schema.GetColIdx(col_name);
     auto col_type = schema.GetColumn(col_idx).GetType();
     allocated_exprs_.emplace_back(std::make_unique<ColumnValueExpression>(tuple_idx, col_idx, col_type));
     return allocated_exprs_.back().get();
   }
 
-  auto MakeConstantValueExpression(const Value &val) -> const AbstractExpression * {
+  const AbstractExpression *MakeConstantValueExpression(const Value &val) {
     allocated_exprs_.emplace_back(std::make_unique<ConstantValueExpression>(val));
     return allocated_exprs_.back().get();
   }
 
-  auto MakeComparisonExpression(const AbstractExpression *lhs, const AbstractExpression *rhs, ComparisonType comp_type)
-      -> const AbstractExpression * {
+  const AbstractExpression *MakeComparisonExpression(const AbstractExpression *lhs, const AbstractExpression *rhs,
+                                                     ComparisonType comp_type) {
     allocated_exprs_.emplace_back(std::make_unique<ComparisonExpression>(lhs, rhs, comp_type));
     return allocated_exprs_.back().get();
   }
 
-  auto MakeAggregateValueExpression(bool is_group_by_term, uint32_t term_idx) -> const AbstractExpression * {
+  const AbstractExpression *MakeAggregateValueExpression(bool is_group_by_term, uint32_t term_idx) {
     allocated_exprs_.emplace_back(
         std::make_unique<AggregateValueExpression>(is_group_by_term, term_idx, TypeId::INTEGER));
     return allocated_exprs_.back().get();
   }
 
-  auto MakeOutputSchema(const std::vector<std::pair<std::string, const AbstractExpression *>> &exprs)
-      -> const Schema * {
+  const Schema *MakeOutputSchema(const std::vector<std::pair<std::string, const AbstractExpression *>> &exprs) {
     std::vector<Column> cols;
     cols.reserve(exprs.size());
     for (const auto &input : exprs) {
@@ -163,7 +171,7 @@ void CheckTxnLockSize(Transaction *txn, size_t shared_size, size_t exclusive_siz
 }
 
 // NOLINTNEXTLINE
-TEST_F(TransactionTest, DISABLED_SimpleInsertRollbackTest) {
+TEST_F(TransactionTest, SimpleInsertRollbackTest) {
   // txn1: INSERT INTO empty_table2 VALUES (200, 20), (201, 21), (202, 22)
   // txn1: abort
   // txn2: SELECT * FROM empty_table2;
@@ -203,7 +211,7 @@ TEST_F(TransactionTest, DISABLED_SimpleInsertRollbackTest) {
 }
 
 // NOLINTNEXTLINE
-TEST_F(TransactionTest, DISABLED_DirtyReadsTest) {
+TEST_F(TransactionTest, DirtyReadsTest) {
   // txn1: INSERT INTO empty_table2 VALUES (200, 20), (201, 21), (202, 22)
   // txn2: SELECT * FROM empty_table2;
   // txn1: abort
@@ -253,5 +261,6 @@ TEST_F(TransactionTest, DISABLED_DirtyReadsTest) {
   GetTxnManager()->Commit(txn2);
   delete txn2;
 }
+
 
 }  // namespace bustub

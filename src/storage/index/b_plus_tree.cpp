@@ -819,7 +819,7 @@ std::pair<Page *, bool> BPLUSTREE_TYPE::FindLeafPageByOperation(const KeyType &k
     } else {
       // 如果是更新操作，给当前数据页加读锁后，检查当前数据页是否安全
       current_page->WLatch();
-      //
+      // 将当前数据页加入事务
       transaction->AddIntoPageSet(page);
       // 如果当前数据页是安全的，root page id锁还没有释放，则释放root page id锁
       // 此时可以说明根数据页一定不会重置，因为该安全的数据页不会发生合并/向兄弟借k-v/分裂，则该数据页之上的数据页同样也不会发生

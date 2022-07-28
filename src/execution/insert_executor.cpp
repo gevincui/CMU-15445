@@ -55,17 +55,22 @@ auto InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     }
   }
 
-  // 向表中插入tuple
+  // 向表中插入tuple，同时把写操作记录到原表write set中
   bool inserted = table_info_->table_->InsertTuple(to_insert_tuple, rid, exec_ctx_->GetTransaction());
+
+  // 给新插入的rid加写锁
+  if (inserted && !exec_ctx_->GetLockManager()->LockExclusive(exec_ctx_->GetTransaction(), *rid)) {
+    return false;
+  }
 
   // 遍历该表所有索引，更新索引
   if (inserted) {
     std::for_each(table_indexes.begin(), table_indexes.end(),
         [&to_insert_tuple, &rid, &table_info = table_info_, &ctx = exec_ctx_](IndexInfo *index) {
               // 将插入的tuple中的索引字段值插入到对应的B+树中
-              index->index_->InsertEntry(
-              to_insert_tuple.KeyFromTuple(table_info->schema_, index->key_schema_, index->index_->GetKeyAttrs()), *rid,
-              ctx->GetTransaction());
+              index->index_->InsertEntry(to_insert_tuple.KeyFromTuple(table_info->schema_, index->key_schema_, index->index_->GetKeyAttrs()), *rid, ctx->GetTransaction());
+              // 把插入操作记录到索引的write set中
+              ctx->GetTransaction()->GetIndexWriteSet()->emplace_back(*rid, table_info->oid_, WType::INSERT, to_insert_tuple, Tuple{}, index->index_oid_, ctx->GetCatalog());
     });
   }
 

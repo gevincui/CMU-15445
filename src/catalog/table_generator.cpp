@@ -178,4 +178,66 @@ void TableGenerator::GenerateTestTables() {
     FillTable(info, &table_meta);
   }
 }
+
+void TableGenerator::GenerateTestTables2() {
+  /**
+   * This array configures each of the test tables. Each table is configured
+   * with a name, size, and schema. We also configure the columns of the table. If
+   * you add a new table, set it up here.
+   */
+  std::vector<TableInsertMeta> insert_meta{
+      // The empty table
+      {"empty_table", 0, {{"colA", TypeId::INTEGER, false, Dist::Serial, 0, 0}}},
+
+      // Table 1
+      {"test_1",
+       TEST1_SIZE,
+       {{"colA", TypeId::INTEGER, false, Dist::Serial, 0, 0},
+        {"colB", TypeId::INTEGER, false, Dist::Uniform, 0, 9},
+        {"colC", TypeId::INTEGER, false, Dist::Uniform, 0, 9999},
+        {"colD", TypeId::INTEGER, false, Dist::Uniform, 0, 99999}}},
+
+      // Table 2
+      {"test_2",
+       TEST2_SIZE,
+       {{"col1", TypeId::SMALLINT, false, Dist::Serial, 0, 0},
+        {"col2", TypeId::INTEGER, true, Dist::Uniform, 0, 9},
+        {"col3", TypeId::BIGINT, false, Dist::Uniform, 0, 1024},
+        {"col4", TypeId::INTEGER, true, Dist::Uniform, 0, 2048}}},
+
+      // Table 3
+      {"test_3",
+       TEST2_SIZE,
+       {{"col1", TypeId::INTEGER, false, Dist::Serial, 0, 0},
+        {"col2", TypeId::INTEGER, true, Dist::Uniform, 10, 19},
+        {"col3", TypeId::BIGINT, false, Dist::Uniform, 0, 1024},
+        {"col4", TypeId::INTEGER, true, Dist::Uniform, 0, 2048}}},
+
+      // Empty table with two columns
+      {"empty_table2",
+       0,
+       {{"colA", TypeId::INTEGER, false, Dist::Serial, 0, 0}, {"colB", TypeId::INTEGER, false, Dist::Uniform, 0, 9}}},
+
+      // Empty table with two columns
+      {"empty_table3",
+       0,
+       {{"outA", TypeId::INTEGER, false, Dist::Serial, 0, 0}, {"outB", TypeId::INTEGER, false, Dist::Uniform, 0, 9}}},
+  };
+
+  for (auto &table_meta : insert_meta) {
+    // Create Schema
+    std::vector<Column> cols{};
+    cols.reserve(table_meta.col_meta_.size());
+    for (const auto &col_meta : table_meta.col_meta_) {
+      if (col_meta.type_ != TypeId::VARCHAR) {
+        cols.emplace_back(col_meta.name_, col_meta.type_);
+      } else {
+        cols.emplace_back(col_meta.name_, col_meta.type_, TEST_VARLEN_SIZE);
+      }
+    }
+    Schema schema(cols);
+    auto info = exec_ctx_->GetCatalog()->CreateTable(exec_ctx_->GetTransaction(), table_meta.name_, schema);
+    FillTable(info, &table_meta);
+  }
+}
 }  // namespace bustub

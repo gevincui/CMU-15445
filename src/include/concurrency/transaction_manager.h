@@ -28,6 +28,8 @@ class LockManager;
 /**
  * TransactionManager keeps track of all the transactions running in the system.
  */
+
+// 全局事务管理器
 class TransactionManager {
  public:
   explicit TransactionManager(LockManager *lock_manager, LogManager *log_manager = nullptr)
@@ -41,6 +43,8 @@ class TransactionManager {
    * @param isolation_level an optional isolation level of the transaction.
    * @return an initialized transaction
    */
+
+  // 开启一个新事务，默认为可重复读隔离级别
   auto Begin(Transaction *txn = nullptr, IsolationLevel isolation_level = IsolationLevel::REPEATABLE_READ)
       -> Transaction *;
 
@@ -48,12 +52,16 @@ class TransactionManager {
    * Commits a transaction.
    * @param txn the transaction to commit
    */
+
+  // 提交事务
   void Commit(Transaction *txn);
 
   /**
    * Aborts a transaction
    * @param txn the transaction to abort
    */
+
+  // 终止事务
   void Abort(Transaction *txn);
 
   /**
@@ -61,7 +69,11 @@ class TransactionManager {
    */
 
   /** The transaction map is a global list of all the running transactions in the system. */
+  // 所有事务的集合
   static std::unordered_map<txn_id_t, Transaction *> txn_map;
+  // share_mutex用于保证对trx_map的访问不会产生并发问题，分为独占式和共享式两种模式
+  // lock_share()：共享式获取锁，可以用于对事务的读操作申请锁
+  // lock()：独占式获取锁，可以用于对事务的写操作申请锁
   static std::shared_mutex txn_map_mutex;
 
   /**
@@ -69,6 +81,8 @@ class TransactionManager {
    * @param txn_id the id of the transaction to be found, it must exist!
    * @return the transaction with the given transaction id
    */
+
+  // 获取事务
   static auto GetTransaction(txn_id_t txn_id) -> Transaction * {
     TransactionManager::txn_map_mutex.lock_shared();
     assert(TransactionManager::txn_map.find(txn_id) != TransactionManager::txn_map.end());
@@ -89,6 +103,8 @@ class TransactionManager {
    * Releases all the locks held by the given transaction.
    * @param txn the transaction whose locks should be released
    */
+
+  // 释放事务的所有锁
   void ReleaseLocks(Transaction *txn) {
     std::unordered_set<RID> lock_set;
     for (auto item : *txn->GetExclusiveLockSet()) {

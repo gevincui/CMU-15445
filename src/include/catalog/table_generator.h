@@ -31,6 +31,8 @@ class TableGenerator {
    */
   void GenerateTestTables();
 
+  void GenerateTestTables2();
+
  private:
   /** Enumeration to characterize the distribution of values in a given column */
   enum class Dist : uint8_t { Uniform, Zipf_50, Zipf_75, Zipf_95, Zipf_99, Serial, Cyclic };

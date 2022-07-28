@@ -49,7 +49,18 @@ auto UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
   // 拿到更新后的tuple的数据
   Tuple updated_tuple = GenerateUpdatedTuple(to_update_tuple);
 
-  // 更新原表tuple数据
+  // 如果仍持有读锁，锁升级为写锁
+  if (exec_ctx_->GetTransaction()->IsSharedLocked(emit_rid)) {
+    if (!exec_ctx_->GetLockManager()->LockUpgrade(exec_ctx_->GetTransaction(), emit_rid)) {
+      return false;
+    }
+  } else if (!exec_ctx_->GetTransaction()->IsExclusiveLocked(emit_rid) && !exec_ctx_->GetLockManager()->LockExclusive(exec_ctx_->GetTransaction(), emit_rid)) {
+    // 如果未持有读锁或写锁，则申请写锁
+    // 如果持有写锁，则无需申请
+    return false;
+  }
+
+  // 更新原表tuple数据，同时把更新操作记录到原表的write set中
   bool updated = table_info_->table_->UpdateTuple(updated_tuple, emit_rid, exec_ctx_->GetTransaction());
 
   // 遍历该表所有索引，更新索引
@@ -58,16 +69,11 @@ auto UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
         table_indexes.begin(), table_indexes.end(),
         [&to_update_tuple, &updated_tuple, &emit_rid, &table_info = table_info_, &ctx = exec_ctx_](IndexInfo *index) {
           // 将旧的tuple中的索引字段值从对应的B+树中删除
-          index->index_->DeleteEntry(
-              to_update_tuple.KeyFromTuple(table_info->schema_, index->key_schema_, index->index_->GetKeyAttrs()),
-              emit_rid, ctx->GetTransaction());
+          index->index_->DeleteEntry(to_update_tuple.KeyFromTuple(table_info->schema_, index->key_schema_, index->index_->GetKeyAttrs()), emit_rid, ctx->GetTransaction());
           // 将更新后的tuple中的索引字段从对应的B+树中插入
-          index->index_->InsertEntry(
-              updated_tuple.KeyFromTuple(table_info->schema_, index->key_schema_, index->index_->GetKeyAttrs()),
-              emit_rid, ctx->GetTransaction());
-          ctx->GetTransaction()->GetIndexWriteSet()->emplace_back(emit_rid, table_info->oid_, WType::UPDATE,
-                                                                  updated_tuple, to_update_tuple, index->index_oid_,
-                                                                  ctx->GetCatalog());
+          index->index_->InsertEntry(updated_tuple.KeyFromTuple(table_info->schema_, index->key_schema_, index->index_->GetKeyAttrs()), emit_rid, ctx->GetTransaction());
+          // 把更新操作记录到索引的write set中
+          ctx->GetTransaction()->GetIndexWriteSet()->emplace_back(emit_rid, table_info->oid_, WType::UPDATE, updated_tuple, to_update_tuple, index->index_oid_, ctx->GetCatalog());
         });
   }
 
